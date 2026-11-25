@@ -39,35 +39,47 @@ theorem T_sound  {V} [SetTheory V] : Derivable T J → Holds V J
 theorem T_consistent {V} [SetTheory V] : ¬ Derivable T ⟦nil |- p : False⟧
 ```
 
-Prove it in two layers.
+**Approach: encode T into con-leche and reuse its soundness proof.** con-leche already
+gives its deductive system a model (`PConst` and so on as the base, with a shallow
+interpretation of `Expr`) and proves the system sound in it. T is meant to be the same
+deductive system written in MM0. So (S) needs no new model. Map every T derivation to a
+con-leche derivation, then apply con-leche's soundness theorem. All the semantic work stays
+in con-leche.
 
-1. **Generic MM0 soundness** (independent of Lean).
-   - An MM0 model gives each sort a carrier set and each term constructor a function.
-   - An expression is read under a valuation of its variables.
-   - Regular variables may depend only on the variables listed in their dependency sets.
-   - Theorem: if a model satisfies every axiom of an environment, it satisfies every theorem
-     derivable from it.
-2. **The Lean model.** Interpret T directly in con-leche's `SetTheory V`, with no syntax in
-   between:
-   - `level` ↦ `ℕ`, given values for the level variables; `l_S`, `l_max`, `l_imax` as usual.
-   - `expr` ↦ `V`, with `Sort u ↦ univ u`, `app ↦ SetTheory.app`,
-     `lambda {x} t e ↦ SetTheory.lam ⟦t⟧ (fun x => ⟦e⟧)`, `Pi ↦ SetTheory.pi`.
-   - `ctx` ↦ a condition on variable assignments: `nil ↦ True`, and `G, x : t` holds when
-     G holds and `ρ x ∈ ⟦t⟧ ρ`.
-   - `G |- e : A` ↦ for every assignment ρ satisfying G, `⟦e⟧ρ ∈ ⟦A⟧ρ`.
-   - `G |= a = b` ↦ for every assignment ρ satisfying G, `⟦a⟧ρ = ⟦b⟧ρ`.
-   - Substitution predicates (`subst:`, `l_subst:`, `substIS:`) ↦ semantic equality with the
-     updated assignment.
+```
+enc : MM0 expr/level/ctx (named variables) → con-leche Expr/Level/context (de Bruijn)
 
-   Reading T semantically means (S) never needs a translation between de Bruijn and named
-   variables.
+theorem T_to_conleche : Derivable T ⟦G |- e : A⟧ → ConLeche.HasType (enc G) (enc e) (enc A)
+-- likewise ⟦G |= a = b⟧; then compose with con-leche's soundness theorem
+```
 
-   Then prove each axiom of T valid, one lemma per axiom (~200 for `lean.mm1`):
-   - The structural, conversion, proof-irrelevance, eta, `quot`, `propext` and `choice`
-     axioms should follow quickly from con-leche's `SetTheory` lemmas.
-   - The inductive axioms (`ty_Ind`, `ty_Ctor`, `ty_Rec`, `conv_iota`, and the `LE_*`
-     large-elimination rules) are the bulk. Borrow from con-leche's inductive model
-     constructions (`whitepaper/Fragment/LfpSet.lean`, `IndSem.lean`, `IndRec.lean`).
+The encoding always goes **from T into con-leche**. (S) never runs `tr` (the con-leche → T
+translation in (A)) backwards.
+
+1. **The encoding `enc`.** Read each MM0 expression as a con-leche `Expr`:
+   - `Sort u ↦ .sort (enc u)`, `app ↦ .app`, `Pi`/`lambda {x} t e ↦ .forallE`/`.lam`,
+     with the named bound variable `x` turned into a de Bruijn index.
+   - `ctx ↦` con-leche context: `nil ↦ []`, `G, x : t ↦ enc t :: enc G`.
+   - Lemmas: `enc` commutes with MM0 substitution (`subst:`, `l_subst:`, `substIS:`)
+     against con-leche's `inst`/`liftN`, and respects MM0 dependency sets (no variable
+     capture).
+2. **Generic MM0 layer** (independent of Lean). MM0's own proof rules (instantiating a
+   theorem, `conv`, definition unfolding) are preserved: if every axiom of an environment
+   holds in the target system under `enc`, every theorem derivable from it does too.
+   This is induction on MM0 derivations and is routine.
+3. **One case per axiom of T** (~200 for `lean.mm1`). Each one is a con-leche rule, a
+   derived rule, or one of the exceptions below. Most are short adapter lemmas.
+
+**Exceptions: rules of T with no con-leche rule to land on.**
+- `conv_trans`: con-leche's `DefEq` deliberately has no transitivity. Encode
+  `G |= a = b` into the equality judgment con-leche's soundness theorem *produces*
+  (the semantic equality of the interpretations, or the transitive closure of `DefEq`),
+  not into `DefEq` itself. Transitivity then holds for free.
+- `l_pl_cases` (level case-splitting): prove it in con-leche's level semantics.
+- The anonymous `Ind t F K` and its rules (`ty_Ind`, `ty_Ctor`, `ty_Rec`, `conv_iota`,
+  `LE_*`): need `Ind` to encode into con-leche's named inductive declarations. This is the
+  largest exception. If it doesn't encode cleanly, change T to match con-leche (see the
+  table below).
 
 The consistency is **relative** to con-leche's `SetTheory` class, which is essentially
 Tarski–Grothendieck set theory. That is the same assumption con-leche itself rests on.
@@ -107,7 +119,7 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
 | Projections and structure eta | absent | present | Add them |
 | Nat/String literals and accelerated arithmetic | absent (`nat` is an `Ind`) | literals, with `Nat` operations computed natively | Add literals plus computation rules. The arithmetic proofs in MM0 must stay efficient |
 | Theorem bodies | n/a | opaque, plus a K-like hack for `And` | Model the opacity; decide whether the `And` hack is part of T |
-| `conv_trans` | an axiom | `DefEq` deliberately has no transitivity | Harmless: the model satisfies it for (S), and (A) doesn't need it |
+| `conv_trans` | an axiom | `DefEq` deliberately has no transitivity | Harmless if `G \|= a = b` encodes into con-leche's semantic equality, not `DefEq` (see (S)). (A) doesn't need it |
 | Axioms | `quot`, `propext`, `choice` | the same three standard axioms | Matches |
 | Level reasoning | complete case-splitting procedure (`l_pl_cases`) | a level oracle (`LevelOracle`) | Check that the oracle's verdicts are derivable in T, as part of (A) |
 
@@ -124,19 +136,22 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
 - [ ] `.mm0` parser in Lean, so `T : MM0.Env` is produced from the file. Test it on `examples/*.mm0`.
 - [ ] (Optional) `.mmb` checker, porting `mm0b.lean`, with `check_sound`.
 
-### M2: Generic MM0 model soundness
-- [ ] Define MM0 models (modernizing `model.lean`).
-- [ ] Prove `sound : Model.satisfiesAxioms M E → Derivable E φ → M ⊨ φ`.
-- [ ] Sanity instance: a small toy theory (e.g. `examples/peano.mm0`).
+### M2: The encoding and the generic layer
+- [ ] `enc` from T's `level`/`expr`/`ctx` into the Fragment's `Level`/`Expr`/contexts.
+- [ ] `enc` commutes with MM0 substitution vs. `inst`/`liftN`, and respects dependency sets.
+- [ ] Generic lemma: MM0 proof rules (theorem instantiation, `conv`, unfolding) preserve
+      "holds under `enc`", so only the axioms of T need checking.
 
 ### M3: (S) for the part without inductives
-- [ ] Interpret `level`, `expr` and `ctx` in `Fragment`'s `SetTheory V` model.
-- [ ] Prove validity of the substitution, typing, conversion, `let`/ζ, proof-irrelevance and η axioms.
-- [ ] Corollary: consistency of the part of T without inductives.
+- [ ] One case per axiom: substitution, typing, conversion, `let`/ζ, proof irrelevance, η,
+      each mapped to a Fragment rule or derived rule.
+- [ ] Exceptions: `conv_trans` (via the semantic equality judgment) and `l_pl_cases`.
+- [ ] Corollary, via the Fragment's `model_exists`: consistency of the part of T without inductives.
 
 ### M4: Extend T, then (S) for all of it
 - [ ] Add the `env` sort, named constants, δ, and universe-level instantiation to T.
-- [ ] Prove validity of the inductive axioms and of `quot`/`propext`/`choice`.
+- [ ] Encode `Ind`/`Ctor`/`Rec` into con-leche's inductive declarations; map `ty_Ind`,
+      `ty_Ctor`, `ty_Rec`, `conv_iota`, `LE_*`, and `quot`/`propext`/`choice`.
 - [ ] `T_consistent`.
 
 ### M5: (A) against the Fragment
@@ -151,10 +166,12 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
 
 ## Risks
 
-- **Translating bound variables (A).** Named variables with dependency sets on the MM0 side,
-  de Bruijn indices on con-leche's. Keep `tr` in one module with a small interface.
-- **Proof size of the inductive axioms (S).** This is the largest part of con-leche's own
-  proof. Reuse its definitions rather than re-deriving them.
+- **Translating bound variables (S and A).** Named variables with dependency sets on the MM0
+  side, de Bruijn indices on con-leche's. `enc` (S) and `tr` (A) face the same problem in
+  opposite directions. Keep both in one module with a small interface.
+- **`Ind` not matching con-leche's inductives (S).** If T's anonymous `Ind` doesn't encode
+  into con-leche's named inductives, the reuse breaks for the inductive axioms. Settle this
+  early, changing T if needed, rather than proving those axioms semantically from scratch.
 - **Lean copy and `.mm0` file drifting apart.** Prevented by producing `T` with the parser
   (M1) and checking in CI.
 - **Efficient arithmetic in MM0.** Native `Nat` computation in con-leche will need an
