@@ -1,0 +1,4 @@
+-- q is not declared. mm0-rs infers it, with a warning that inference is not allowed in MM0 files.
+provable sort wff;
+term imp: wff > wff > wff;
+axiom a (p: wff): $ imp p q $;

@@ -1,0 +1,70 @@
+# Expected verdicts of `mm0-lean check` (paths relative to the repo root).
+# Format: VERDICT PATH [# reason, when it differs from mm0-rs]
+#
+# tests/mm0_mmu/fail/bad-sort*: mm0-rs accepts sort modifiers out of order;
+#   mm0-c and mm0.md do not.
+# tests/mm0_mmu/fail/blank_binder_alias: the .mm0 is well formed; the test
+#   fails only against its proof file.
+# examples/string.mm0: mm0-rs rejects `input string:`; input is optional.
+accept examples/compiler.mm0
+accept examples/goldbach.mm0
+accept examples/hello.mm0
+accept examples/hello_assembler.mm0
+accept examples/hello_mmc.mm0
+accept examples/hol.mm0
+accept examples/miu.mm0
+accept examples/mm0.mm0
+accept examples/peano.mm0
+accept examples/peano_hex.mm0
+accept examples/set.mm0
+accept examples/string.mm0
+accept examples/unprovable.mm0
+accept examples/verifier.mm0
+accept examples/x86.mm0
+reject tests/mm0_mmu/fail/bad-id1.mm0
+reject tests/mm0_mmu/fail/bad-id2.mm0
+reject tests/mm0_mmu/fail/bad-id3.mm0
+reject tests/mm0_mmu/fail/bad-id4.mm0
+reject tests/mm0_mmu/fail/bad-id5.mm0
+reject tests/mm0_mmu/fail/bad-int2.mm0
+reject tests/mm0_mmu/fail/bad-int3.mm0
+reject tests/mm0_mmu/fail/bad-int4.mm0
+reject tests/mm0_mmu/fail/bad-int5.mm0
+reject tests/mm0_mmu/fail/bad-math-string1.mm0
+reject tests/mm0_mmu/fail/bad-math-string2.mm0
+reject tests/mm0_mmu/fail/bad-math-string3.mm0
+reject tests/mm0_mmu/fail/bad-sort21.mm0
+reject tests/mm0_mmu/fail/bad-sort31.mm0
+reject tests/mm0_mmu/fail/bad-sort32.mm0
+reject tests/mm0_mmu/fail/bad-sort41.mm0
+reject tests/mm0_mmu/fail/bad-sort42.mm0
+reject tests/mm0_mmu/fail/bad-sort43.mm0
+reject tests/mm0_mmu/fail/bad-whitespace1.mm0
+reject tests/mm0_mmu/fail/bad-whitespace2.mm0
+reject tests/mm0_mmu/fail/bad-whitespace3.mm0
+reject tests/mm0_mmu/fail/bad-whitespace4.mm0
+accept tests/mm0_mmu/fail/blank_binder_alias.mm0
+reject tests/mm0_mmu/fail/non-ascii1.mm0
+reject tests/mm0_mmu/fail/non-ascii2.mm0
+accept tests/mm0_mmu/pass/blank_binder.mm0
+accept tests/mm0_mmu/pass/comment.mm0
+accept tests/mm0_mmu/pass/id.mm0
+accept tests/mm0_mmu/pass/int.mm0
+accept tests/mm0_mmu/pass/sort.mm0
+accept tests/mm0_mmu/pass/whitespace1.mm0
+accept tests/mm0_mmu/pass/whitespace2.mm0
+reject tests/mm0_mmu/run/bad-int1.mm0
+reject tests/mm0_mmu/run/binders_overflow_in_axiom.mm0
+reject tests/mm0_mmu/run/math-string.mm0
+reject tests/elab/fail-rs/dup-sort.mm0 # tests/elab/fail-rs
+reject tests/elab/fail-rs/leading-zero.mm0 # tests/elab/fail-rs
+reject tests/elab/fail-rs/mixed-assoc.mm0 # tests/elab/fail-rs
+reject tests/elab/fail-rs/notation-bad-binder.mm0 # tests/elab/fail-rs
+reject tests/elab/fail-rs/undeclared-var.mm0 # tests/elab/fail-rs
+reject tests/elab/fail/coercion-cycle.mm0 # tests/elab/fail
+reject tests/elab/fail/def-free-var.mm0 # tests/elab/fail
+reject tests/elab/fail/dummy-free-sort.mm0 # tests/elab/fail
+reject tests/elab/fail/dup-token.mm0 # tests/elab/fail
+reject tests/elab/fail/term-in-pure-sort.mm0 # tests/elab/fail
+accept tests/elab/pass-rs/doc-comment-mid-stmt.mm0 # tests/elab/pass-rs
+accept tests/elab/pass/paren-split.mm0 # tests/elab/pass

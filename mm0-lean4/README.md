@@ -1,3 +1,72 @@
 # mm0-lean4
 
-Scratch files written in Lean 4
+MM0 in Lean 4, with no dependencies, so it can be mainlined. It holds the
+derivability spec and the `.mm0` parser now, and will hold generic model
+soundness (Plan.md, M2). The con-leche half of the [`../Plan.md`](../Plan.md)
+sanity check is a separate package, [`../mm0-sanity`](../mm0-sanity), which
+requires this one and con-leche.
+
+| Path | What |
+|---|---|
+| `MM0/Spec.lean` | MM0 derivability: a port of `mm0-lean/mm0/mm0.lean` (Lean 3) |
+| `MM0/Parse.lean` | `.mm0` lexer, parser and elaborator, producing an `MM0.Env` |
+| `Main.lean` | `mm0-lean check FILE.mm0` / `mm0-lean dump FILE.mm0` |
+| `Fuzz.lean` | `mm0-fuzz`: differential fuzzer against `mm0-rs` and `mm0-c` |
+| `tests/` | `run.sh` and the expected verdicts (`expected.txt`) for `../examples`, `../tests/mm0_mmu` and `../tests/elab` |
+
+## Build and test
+
+    lake build
+    tests/run.sh               # fixed verdicts (tests/expected.txt)
+    tests/run.sh fuzz 300      # plus 300 fuzzed mutants against mm0-rs and mm0-c
+
+`tests/run.sh fuzz` needs `mm0-rs` and `mm0-c` (set `MM0_RS` / `MM0_C`, or put
+them on `PATH`), and `FUZZ_SEED` picks the random seed.
+
+The fuzzer mutates seed files (characters, lines, identifiers, digits, plus
+whitespace and comment insertions that should not change anything). It checks
+two oracles:
+
+* **mm0-rs**: `mm0-rs compile` must accept a mutant exactly when the Lean
+  parser does.
+* **mm0-c**: for seeds that have a proof file, `mm0-c SEED.mmb < MUTANT.mm0`
+  must accept exactly when the Lean parser elaborates the mutant to the
+  seed's declarations. mm0-c checks neither names nor notations.
+
+Known differences are counted but not reported as failures. Each is listed
+in `knownRsDifference` in `Fuzz.lean` and has a small test in `../tests/elab/` (the `fail-rs`/`pass-rs` groups). In each case
+the Lean parser follows `mm0.md` and, where they agree, `mm0-c`. Some of
+these differences look like real mm0-rs or mm0-c bugs:
+
+* mm0-rs accepts duplicate `sort` declarations;
+* mm0-rs and mm0-c accept numbers with a leading zero (`prec 01`).
+  `tests/mm0_mmu/fail/bad-int5.mm0` does not catch this: mm0-rs rejects it
+  only because the term `p` is never declared;
+* mm0-rs accepts an `infixl` and an `infixr` at the same precedence (mm0-c
+  rejects that);
+* mm0-rs does not check the binder sorts of a `notation`;
+* mm0-rs infers undeclared variables in `.mm0` files (with a warning);
+* mm0-rs accepts sort modifiers out of order (mm0-c rejects that);
+* mm0-rs restricts where `--|` doc comments may appear;
+* mm0-rs implements no `input` kinds.
+
+### Building mm0-rs and mm0-c on Windows without MSVC or gcc
+
+Rust's MSVC target needs `link.exe`. Instead, use the GNU-host toolchain
+and link with the clang that ships with Lean:
+
+    rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+    # lean-cc.bat:
+    #   @"<lean toolchain>\bin\clang.exe" --target=x86_64-w64-windows-gnu -fuse-ld=lld
+    #     --sysroot="<rust-gnu>\lib\rustlib\x86_64-pc-windows-gnu\lib\self-contained"
+    #     -B"<same>" -rtlib=libgcc -unwindlib=libgcc -L"<same>" -L"<dir with libshlwapi.a>" %*
+    # libshlwapi.a: copy of winapi-x86_64-pc-windows-gnu's libwinapi_shlwapi.a
+    CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=lean-cc.bat \
+      cargo +stable-x86_64-pc-windows-gnu build --release     # in ../mm0-rs
+
+mm0-c needs C headers. The MinGW clang that ships with GHC works. Windows'
+`io.h` declares `eof`, which clashes with mm0-c's, so build from a copy with
+the name changed:
+
+    cp -r ../mm0-c /tmp/csrc && sed -i 's/\beof\b/mm0c_eof/g' /tmp/csrc/*.c
+    <ghc>/mingw/bin/clang /tmp/csrc/main.c -O2 -o mm0-c.exe

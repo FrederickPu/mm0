@@ -1,0 +1,3 @@
+-- A pure sort has no term constructors (mm0.md, Sorts).
+pure provable sort s;
+term a: s;

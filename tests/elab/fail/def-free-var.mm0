@@ -1,0 +1,4 @@
+-- x is free in the definiens (al does not bind it here) but not in the return type.
+provable sort wff; sort set;
+term al {x: set} (p: wff x): wff;
+def bad {x: set} (p: wff x): wff = $ p $;

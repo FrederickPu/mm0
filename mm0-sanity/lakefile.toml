@@ -1,0 +1,19 @@
+name = "mm0-sanity"
+version = "0.1.0"
+defaultTargets = ["MM0Sanity"]
+
+# The Plan.md sanity check: T is sound for con-leche's model (the encoding into
+# con-leche and the per-axiom cases). MM0 itself lives in ../mm0-lean4.
+
+[[require]]
+name = "mm0"
+path = "../mm0-lean4"
+
+# Pinned deliberately (Plan.md, Risks: upstream drift). Bump by hand.
+[[require]]
+name = "con-leche"
+git = "https://github.com/leanprover/con-leche"
+rev = "bc6676101c488e21ce71a317b33905534d497e14"
+
+[[lean_lib]]
+name = "MM0Sanity"

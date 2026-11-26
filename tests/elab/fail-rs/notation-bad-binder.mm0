@@ -1,0 +1,3 @@
+-- A notation's binders must match the term's (mm0.md: notation requires its variables be annotated with types). mm0-rs does not check them.
+sort s; term f: s > s;
+notation f (x: nosuchsort): s = ($!$:5) x;

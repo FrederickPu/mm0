@@ -1,0 +1,5 @@
+-- Dummy variables may not have a free sort (mm0.md, Sorts).
+provable sort wff; free sort set;
+term al {x: set} (p: wff x): wff;
+term eq (a b: set): wff;
+def d {.y: set}: wff = $ al y (eq y y) $;

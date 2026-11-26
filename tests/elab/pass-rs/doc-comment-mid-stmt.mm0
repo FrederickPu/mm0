@@ -1,0 +1,5 @@
+-- --| comments have no semantic value (mm0.md, Lexical structure), so one may appear inside a statement. mm0-rs rejects this.
+sort s;
+term
+--|doc
+a: s;

@@ -1,0 +1,3 @@
+-- A sort may be declared only once (mm0.mm0, DeclSort). mm0-rs accepts this.
+sort s;
+sort s;

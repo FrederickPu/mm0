@@ -126,14 +126,24 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
 ## Milestones
 
 ### M0: Set up
-- [ ] Lean 4 package on `leanprover/lean4:v4.36.0`, with `require` on con-leche (no transitive dependencies).
+- [x] Lean 4 package on `leanprover/lean4:v4.36.0`, with `require` on con-leche (no transitive dependencies). Done: `mm0-lean4/` (MM0 itself, no dependencies) and `mm0-sanity/` (the con-leche part; requires `mm0-lean4` and con-leche, pinned at `bc66761`).
 - [ ] Vendor `lean.mm1` and split it into `lean.mm0` (the statements we trust) and `lean.mm1` (proofs).
 - [ ] Build `lean.mmb` with `mm0-rs`; CI also runs `mm0-c` on it.
 
 ### M1: MM0 in Lean 4
-- [ ] Port `mm0-lean/mm0/mm0.lean`: sorts with modifiers, terms, defs with unfolding, axioms, theorems, bound vs regular variables, dependency sets, `Derivable`.
-- [ ] Cross-check it rule by rule against `examples/mm0.mm0`.
-- [ ] `.mm0` parser in Lean, so `T : MM0.Env` is produced from the file. Test it on `examples/*.mm0`.
+- [x] Port `mm0-lean/mm0/mm0.lean` (`mm0-lean4/MM0/Spec.lean`): sorts with modifiers, terms, defs with unfolding, axioms, theorems, bound vs regular variables, dependency sets, `Derivable`.
+- [ ] Cross-check it rule by rule against `examples/mm0.mm0`. Found so far: `DefOk` in
+      `mm0.mm0` (and the Lean 3 port) lets free variables of `free` sorts escape a definition,
+      while mm0-c forbids dummies of `free` sorts and requires every free variable to be in the
+      return dependencies. Decide which one T's soundness proof uses.
+- [x] `.mm0` parser in Lean, so `T : MM0.Env` is produced from the file
+      (`mm0-lean4/MM0/Parse.lean`). Agrees with mm0-rs on all of `examples/*.mm0` and
+      `tests/mm0_mmu`, except where it follows `mm0.md`/mm0-c on purpose.
+- [x] Regression and differential fuzz tests against mm0-rs and mm0-c
+      (`mm0-lean4/tests/run.sh`, `mm0-lean4/Fuzz.lean`). Known differences, including
+      apparent mm0-rs/mm0-c bugs, are listed in `mm0-lean4/README.md`.
+- [ ] Not yet proved: that the parser's output satisfies `Env.Ok`. Today the parser is tested,
+      not verified.
 - [ ] (Optional) `.mmb` checker, porting `mm0b.lean`, with `check_sound`.
 
 ### M2: The encoding and the generic layer

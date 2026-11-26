@@ -50,6 +50,32 @@ for test in run/*.mm0; do
 done; echo
 cd ..
 
+cd elab
+# Elaboration tests for .mm0 files, grouped like mmb/ by the combination of
+# verdicts: the spec's (which mm0-lean follows) and mm0-rs's. The -rs groups
+# are where mm0-rs disagrees with mm0.md; see elab/README.md. mm0-lean is
+# optional: build it with `lake build mm0-lean` in mm0-lean4/.
+if command -v mm0-lean >/dev/null; then lean=1; else lean=0; fi
+for test in pass/*.mm0; do
+  run_test ./run-mm0-rs.sh "mm0-rs elab/" ${test%.*} mm0 0
+  [ $lean = 1 ] && run_test ./run-mm0-lean.sh "mm0-lean elab/" ${test%.*} mm0 0
+done; echo
+for test in fail/*.mm0; do
+  run_test ./run-mm0-rs.sh "mm0-rs elab/" ${test%.*} mm0 "1 2 255"
+  [ $lean = 1 ] && run_test ./run-mm0-lean.sh "mm0-lean elab/" ${test%.*} mm0 1
+done; echo
+# Rejected by the spec, accepted by mm0-rs.
+for test in fail-rs/*.mm0; do
+  run_test ./run-mm0-rs.sh "mm0-rs elab/" ${test%.*} mm0 0
+  [ $lean = 1 ] && run_test ./run-mm0-lean.sh "mm0-lean elab/" ${test%.*} mm0 1
+done; echo
+# Accepted by the spec, rejected by mm0-rs.
+for test in pass-rs/*.mm0; do
+  run_test ./run-mm0-rs.sh "mm0-rs elab/" ${test%.*} mm0 "1 2 255"
+  [ $lean = 1 ] && run_test ./run-mm0-lean.sh "mm0-lean elab/" ${test%.*} mm0 0
+done; echo
+cd ..
+
 cd mm1
 for test in pass/*.mm1; do
   run_test ./run.sh mm1/ ${test%.*} mm1 0

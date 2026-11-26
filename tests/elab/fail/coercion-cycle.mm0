@@ -1,0 +1,5 @@
+-- Coercions must form a graph whose undirected version is acyclic (mm0.md, Secondary parsing).
+sort s; sort t;
+term f (x: s): t; term g (x: t): s;
+coercion f: s > t;
+coercion g: t > s;

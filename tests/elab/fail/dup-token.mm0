@@ -1,0 +1,4 @@
+-- A token can be declared by only one notation.
+sort s; term a: s;
+prefix a: $ * $ prec 0;
+prefix a: $ * $ prec 0;

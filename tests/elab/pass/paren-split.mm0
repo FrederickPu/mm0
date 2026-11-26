@@ -1,0 +1,5 @@
+-- `)` is only a right delimiter, but grouping parens are read one character at a time, so `)->` is `)` then `->`.
+delimiter $ ( $ $ ) $;
+provable sort w;
+term i: w > w > w; infixr i: $->$ prec 25;
+axiom a (p q: w): $ (p)-> q $;

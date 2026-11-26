@@ -1,0 +1,4 @@
+-- One precedence level cannot be both left and right associative. mm0-c rejects this; mm0-rs accepts it.
+sort s; term f: s > s > s; term g: s > s > s;
+infixl f: $+$ prec 5;
+infixr g: $*$ prec 5;
