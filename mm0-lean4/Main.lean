@@ -1,5 +1,6 @@
 import MM0.Parse
 import MM0.MMB
+import MM0.GenMM0
 
 /-!
 The `mm0-lean` command-line tool.
@@ -15,6 +16,9 @@ The `mm0-lean` command-line tool.
 * `mm0-lean verify FILE.mm0 FILE.mmb`: read the `.mmb` proof file
   (`MM0.MMB`) and check it against the `.mm0` file with the verified checker
   (`MM0.Check.checkFile`); exit 0 if it checks.
+* `mm0-lean genmm0 FILE.mm1 FILE.mmb`: print the `.mm0` counterpart of an
+  `.mm1` file, with the binders it leaves out filled in from its `.mmb`
+  (`MM0.GenMM0`).
 * `mm0-lean leanproof FILE.mm0 FILE.mmb ENV MODULE NAME`: print a Lean module
   proving `NAME : ENV.Proof` (with `ENV` defined in `MODULE`), by having the
   kernel run the verified checker on what the reader produced.
@@ -146,6 +150,10 @@ def verify (mm0 mmb : String) : IO UInt32 := do
 def main (args : List String) : IO UInt32 := do
   match args with
   | ["verify", mm0, mmb] => verify mm0 mmb
+  | ["genmm0", mm1, mmb] =>
+    match MM0.GenMM0.genMM0 (← IO.FS.readFile mm1) (← IO.FS.readBinFile mmb) with
+    | .ok s => IO.print s; return 0
+    | .error e => IO.eprintln s!"{mm1}: {e}"; return 1
   | ["leanproof", mm0, mmb, envName, envModule, name] =>
     let E ← match ← (elabFileIO mm0).run with
       | .ok (env, _) => pure env.toList

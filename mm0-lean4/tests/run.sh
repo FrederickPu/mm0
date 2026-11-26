@@ -46,10 +46,23 @@ if ! mm0lean leanproof examples/set.mm0 mm0-lean4/tests/mmb/set.mmb setEnv MM0Ex
   echo "  mm0-lean leanproof examples/set.mm0 mm0-lean4/tests/mmb/set.mmb setEnv MM0Examples.SetEnv setProved > mm0-lean4/MM0Examples/SetProof.lean"
   gen_ok=0
 fi
+# T, the theory of the con-leche sanity check (mm0-sanity/T)
+tmm0=$(mktemp)
+{ sed -n '1,6p' mm0-sanity/T/lean.mm0; mm0lean genmm0 examples/lean.mm1 mm0-sanity/T/lean.mmb; } > "$tmm0"
+if ! cmp -s "$tmm0" mm0-sanity/T/lean.mm0; then
+  echo "FAIL mm0-sanity/T/lean.mm0 is out of date: regenerate with mm0-lean genmm0 (see its header)"
+  gen_ok=0
+fi
+if ! mm0lean lean mm0-sanity/T/lean.mm0 T | cmp -s - mm0-sanity/MM0Sanity/T.lean; then
+  echo "FAIL mm0-sanity/MM0Sanity/T.lean is out of date: regenerate with"
+  echo "  mm0-lean lean mm0-sanity/T/lean.mm0 T > mm0-sanity/MM0Sanity/T.lean"
+  gen_ok=0
+fi
 [ $gen_ok = 1 ] || exit 1
 echo "generated files: ok"
 
 mm0lean verify examples/set.mm0 mm0-lean4/tests/mmb/set.mmb
+mm0lean verify mm0-sanity/T/lean.mm0 mm0-sanity/T/lean.mmb
 
 [ "$mode" = fuzz ] || exit 0
 rs=${MM0_RS:-mm0-rs}; c=${MM0_C:-mm0-c}
