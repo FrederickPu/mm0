@@ -202,6 +202,31 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
 - [ ] (S) and (A) against `ConLeche/Rules/Rel.lean` and `ConLeche.Denotes`.
 - [ ] Freeze `lean.mm0`. This is the point to start transpiling.
 
+## Backlog
+
+Not blocking the con-leche work; pick up when needed.
+
+- **Streaming verified `.mmb` checker.** Today `MM0/MMB.lean` builds proof terms and
+  `MM0/Check.lean` checks them. That is simple and sound, but it builds whole proof trees, loses
+  the sharing of `Save`/`Ref` (shared subproofs are copied, worst case exponentially), and is slow
+  for the kernel on large files. The efficient version runs mm0-c's stack machine directly over the
+  bytes, with expressions shared through a store, and is proved sound by an invariant: every
+  `proof e` on the stack or heap is derivable, every conversion is a valid `Conv`. No proof terms
+  are built. It reuses the existing typing, `HasVar`, `SafeSubst` and conversion lemmas. Needed
+  once there is a large `.mmb` to check in the kernel (likely `lean.mmb`).
+- **`Env.Ok` checker.** `checkFile` gives `Env.Proof` but does not check well-formedness, which
+  `Env.Proof'.sound` also needs. Add a computable `Env.Ok` check with its soundness proof.
+- **Models of proof files.** Interpreting a new definition by its body preserves `Model.Of`. With
+  that and the `Env.Ok` checker, `set_sound` can use `setProved` instead of assuming proofs exist.
+- **Completeness of the reader.** The reader plus checker accepts every proof of `set`, `hol` and
+  `peano`. Nothing proves it accepts everything mm0-c accepts. Test more files, e.g. `mm0.mmb`,
+  `peano_hex.mmb`.
+- **Upstream reports.** The `mm0.mm0` gaps (side conditions read from the wrong context; unfolding
+  without distinct dummies), the `mmb.md` error (unify streams are inline), and the mm0-rs issues
+  found by the fuzzer (`mm0-lean4/README.md`).
+- **`mm0b.lean` quirks.** The faithful port keeps its typo (`unfold` stated for `cong`) and empty
+  `initial_state`. Add corrected versions next to it if the operational semantics is ever used.
+
 ## Risks
 
 - **Translating bound variables (S and A).** Named variables with dependency sets on the MM0
