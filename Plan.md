@@ -162,7 +162,11 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
       definition is checked. This caught a flaw in the first version of the semantics (no sort
       carriers, so bound variables could take junk values and `ax_12` failed). The fix follows
       the Lean 3 `model.lean`, ported faithfully in `MM0/Lean3Model.lean`.
-- [ ] Port `mm0-lean/mm0/mm0b.lean` (`.mmb` semantics), so that `set_sound` can take its
+- [x] Port `mm0-lean/mm0/mm0b.lean` (`.mmb` semantics): `mm0-lean4/MM0/Lean3MMB.lean`. The
+      Lean 3 file proves nothing and has an empty `initial_state`. The port keeps that, and a
+      typo (its `unfold` rule is stated for the `cong` command).
+- [ ] `check_sound`: an `.mmb` checker in Lean whose acceptance implies `Env.Proof'`, so that
+      `set_sound` can take its
       `Env.Proof'` from a checked `set.mmb` instead of as a hypothesis.
 - [ ] `enc` from T's `level`/`expr`/`ctx` into the Fragment's `Level`/`Expr`/contexts, or a
       `Model` built from con-leche's set-theoretic interpretation (see M3).

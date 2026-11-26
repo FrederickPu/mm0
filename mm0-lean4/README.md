@@ -11,6 +11,7 @@ requires this one and con-leche.
 | `MM0/Spec.lean` | MM0 derivability: a port of `mm0-lean/mm0/mm0.lean` (Lean 3) |
 | `MM0/Parse.lean` | `.mm0` lexer, parser and elaborator, producing an `MM0.Env` |
 | `MM0/Lean3Model.lean` | Faithful port of the Lean 3 `mm0-lean/mm0/model.lean` (unfinished there), mapped to `MM0/Model.lean` |
+| `MM0/Lean3MMB.lean` | Faithful port of the Lean 3 `mm0-lean/mm0/mm0b.lean`: the `.mmb` operational semantics (no theorems there) |
 | `MM0/Model.lean` | Models of MM0 (sorted carriers, nominal variables) and what it means to satisfy an environment |
 | `MM0/Sound.lean` | Soundness: theorems of a proved environment are valid in every model (`Env.Proof'.sound`) |
 | `Main.lean` | `mm0-lean check FILE.mm0` / `mm0-lean dump FILE.mm0` |
