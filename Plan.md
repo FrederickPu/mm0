@@ -169,11 +169,14 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
       the checker accepts a proof file (declarations, keep/skip/define tags against the `.mm0`
       file, and a proof term per theorem), then `Env.Proof` holds. The checker is structurally
       recursive, so the kernel can run it (`MM0Examples/CheckExample.lean`).
-- [ ] `.mmb` reader: turn an `.mmb` file into the checker's input. Unverified by design: a
-      wrong reading is rejected by the checker. Then the theorems of a `.mm0` file follow from
-      running the checker on its `.mmb`, so that
-      `set_sound` can take its
-      `Env.Proof'` from a checked `set.mmb` instead of as a hypothesis.
+- [x] `.mmb` reader (`mm0-lean4/MM0/MMB.lean`), unverified by design: a wrong reading is
+      rejected by the checker. `mm0-lean verify` accepts every proof of `set.mmb` (26),
+      `hol.mmb` (99) and `peano.mmb` (2700). `MM0Examples/SetProof.lean` proves
+      `setProved : setEnv.Proof` with the kernel running the checker (`decide +kernel`, standard
+      axioms only). Found an error in `mm0-c/mmb.md`: the unify stream of a term or theorem
+      follows its binders directly, not through a `p32` pointer.
+- [ ] Use `setProved` in `set_sound`. That needs models to extend to the proof file's extra
+      definitions (interpreting a new definition by its body preserves `Model.Of`).
 - [ ] `enc` from T's `level`/`expr`/`ctx` into the Fragment's `Level`/`Expr`/contexts, or a
       `Model` built from con-leche's set-theoretic interpretation (see M3).
 

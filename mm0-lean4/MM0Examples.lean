@@ -1,5 +1,6 @@
 import MM0Examples.SetModel
 import MM0Examples.CheckExample
+import MM0Examples.SetProof
 
 /-!
 # Examples

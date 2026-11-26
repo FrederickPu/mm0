@@ -649,6 +649,11 @@ partial def freeVars (st : ElabState) (ctx : Ctx) : SExpr → List VarId
         ((findIdx boundIdx (· == d)).bind (bvs[·]?)).getD []
       fromRegs ++ fromRet
 
+/-- Dependencies are a set: keep them sorted and without repeats, as the
+`.mmb` format stores them (a bit set), so both readers agree. -/
+def normDeps (vs : List VarId) : List VarId :=
+  ((List.range ((vs.foldl max 0) + 1)).filter vs.contains)
+
 /-- Check and convert the variable binders of a statement. Returns the
 context, the variable names and the hypotheses (as strings). -/
 def elabBinders (bis : List RBinder) (allowDummies : Bool) :
@@ -682,7 +687,7 @@ def elabBinders (bis : List RBinder) (allowDummies : Bool) :
           match findIdx vctx (·.1 == d) with
           | some i => if vctx[i]!.2.2 then pure i else throw s!"'{d}' is not a bound variable"
           | none => throw s!"unknown variable '{d}'"
-        ctx := ctx ++ [.reg sid vs]
+        ctx := ctx ++ [.reg sid (normDeps vs)]
         vctx := vctx ++ [(b.name.getD "_", sid, false)]
   -- dummies go after the arguments (`appendDummies`)
   for (x, s) in dummies do
@@ -697,7 +702,7 @@ def elabRet (vctx : VarCtx) (nargs : Nat) (ret : String × List String) : E DepT
     match findIdx (vctx.take nargs) (·.1 == d) with
     | some i => if vctx[i]!.2.2 then pure i else throw s!"'{d}' is not a bound variable"
     | none => throw s!"unknown variable '{d}'"
-  return (s, vs)
+  return (s, normDeps vs)
 
 def newTermName (x : String) : E Unit := do
   if (← termId? x).isSome then throw s!"duplicate term '{x}'"

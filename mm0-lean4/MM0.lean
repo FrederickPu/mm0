@@ -5,6 +5,7 @@ import MM0.Lean3MMB
 import MM0.Model
 import MM0.Sound
 import MM0.Check
+import MM0.MMB
 
 /-!
 # MM0 in Lean 4
@@ -22,6 +23,8 @@ of con-leche so that it can be mainlined.
   what it means for a model to satisfy an environment.
 * `MM0.Check`: a computable checker for MM0 proofs, proved to imply
   derivability (`checkFile_sound`, Plan.md's `check_sound`).
+* `MM0.MMB`: an (unverified) reader turning `.mmb` proof files into the
+  checker's input.
 * `MM0.Sound`: soundness. In a well-formed environment whose theorems all
   have proofs, every theorem is valid in every model (`Env.Proof'.sound`).
 -/
