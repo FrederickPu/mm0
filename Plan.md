@@ -165,7 +165,13 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
 - [x] Port `mm0-lean/mm0/mm0b.lean` (`.mmb` semantics): `mm0-lean4/MM0/Lean3MMB.lean`. The
       Lean 3 file proves nothing and has an empty `initial_state`. The port keeps that, and a
       typo (its `unfold` rule is stated for the `cong` command).
-- [ ] `check_sound`: an `.mmb` checker in Lean whose acceptance implies `Env.Proof'`, so that
+- [x] `check_sound`, verified core (`mm0-lean4/MM0/Check.lean`): `checkFile_sound` says that if
+      the checker accepts a proof file (declarations, keep/skip/define tags against the `.mm0`
+      file, and a proof term per theorem), then `Env.Proof` holds. The checker is structurally
+      recursive, so the kernel can run it (`MM0Examples/CheckExample.lean`).
+- [ ] `.mmb` reader: turn an `.mmb` file into the checker's input. Unverified by design: a
+      wrong reading is rejected by the checker. Then the theorems of a `.mm0` file follow from
+      running the checker on its `.mmb`, so that
       `set_sound` can take its
       `Env.Proof'` from a checked `set.mmb` instead of as a hypothesis.
 - [ ] `enc` from T's `level`/`expr`/`ctx` into the Fragment's `Level`/`Expr`/contexts, or a

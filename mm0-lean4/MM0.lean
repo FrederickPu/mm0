@@ -4,6 +4,7 @@ import MM0.Lean3Model
 import MM0.Lean3MMB
 import MM0.Model
 import MM0.Sound
+import MM0.Check
 
 /-!
 # MM0 in Lean 4
@@ -19,6 +20,8 @@ of con-leche so that it can be mainlined.
   `mm0-lean/mm0/model.lean` and `mm0b.lean`, both unfinished there.
 * `MM0.Model`: models of MM0 (a meaning for each term, read nominally) and
   what it means for a model to satisfy an environment.
+* `MM0.Check`: a computable checker for MM0 proofs, proved to imply
+  derivability (`checkFile_sound`, Plan.md's `check_sound`).
 * `MM0.Sound`: soundness. In a well-formed environment whose theorems all
   have proofs, every theorem is valid in every model (`Env.Proof'.sound`).
 -/
