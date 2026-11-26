@@ -147,10 +147,25 @@ theorem check_sound : checkMMB T bytes = .ok → ∀ φ ∈ theorems bytes, Deri
 - [ ] (Optional) `.mmb` checker, porting `mm0b.lean`, with `check_sound`.
 
 ### M2: The encoding and the generic layer
-- [ ] `enc` from T's `level`/`expr`/`ctx` into the Fragment's `Level`/`Expr`/contexts.
-- [ ] `enc` commutes with MM0 substitution vs. `inst`/`liftN`, and respects dependency sets.
-- [ ] Generic lemma: MM0 proof rules (theorem instantiation, `conv`, unfolding) preserve
-      "holds under `enc`", so only the axioms of T need checking.
+- [x] Generic MM0 soundness (`mm0-lean4/MM0/Model.lean`, `MM0/Sound.lean`, no `sorry`):
+      `Env.Proof'.sound` says every theorem of a well-formed, proved environment is valid in
+      every model of it (`Model.Of`: agrees with the binders, satisfies `Frame`, interprets
+      definitions by their bodies, satisfies the axioms). Variables are read nominally
+      (expressions denote functions of a valuation of names), as in `model.lean`.
+- [x] Fixing the spec so the theorem holds. `mm0.mm0` (and the Lean 3 port) checks a theorem
+      instantiation's side conditions against the proof's context instead of the theorem's
+      binders, and does not require the dummies of an unfolded definition to be distinct. The
+      Lean 3 port also drops their freshness. `MM0/Spec.lean` uses the versions mm0-c enforces;
+      its module docs list each change. Report these upstream.
+- [x] Sanity instance (`mm0-lean4/MM0Examples/SetModel.lean`): `examples/set.mm0`, as
+      produced by the parser, has a model in any model of ZFC (`model_of`). Every axiom and
+      definition is checked. This caught a flaw in the first version of the semantics (no sort
+      carriers, so bound variables could take junk values and `ax_12` failed). The fix follows
+      the Lean 3 `model.lean`, ported faithfully in `MM0/Lean3Model.lean`.
+- [ ] Port `mm0-lean/mm0/mm0b.lean` (`.mmb` semantics), so that `set_sound` can take its
+      `Env.Proof'` from a checked `set.mmb` instead of as a hypothesis.
+- [ ] `enc` from T's `level`/`expr`/`ctx` into the Fragment's `Level`/`Expr`/contexts, or a
+      `Model` built from con-leche's set-theoretic interpretation (see M3).
 
 ### M3: (S) for the part without inductives
 - [ ] One case per axiom: substitution, typing, conversion, `let`/ζ, proof irrelevance, η,

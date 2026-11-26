@@ -484,7 +484,7 @@ partial def coePath (coes : List (SortId × SortId × TermId)) (a b : SortId)
 
 def coerce (x : Typed) (s : SortId) : E SExpr := do
   match coePath (← get).coes x.sort s with
-  | some path => return path.foldl (fun e t => .app1 (.term t) e) x.e
+  | some path => return path.foldl (fun e t => .app t [e]) x.e
   | none =>
     let st ← get
     throw s!"type mismatch: expected {st.sorts[s]!.1}, got {st.sorts[x.sort]!.1}"
@@ -532,10 +532,10 @@ partial def elabArg (x : Typed) (bi : Binder) : M SExpr := do
 partial def applyTerm (t : TermId) (args : List Typed) : M Typed := do
   let info := (← getThe ElabState).terms[t]!
   unless args.length == info.args.length do throw s!"wrong number of arguments to {info.name}"
-  let mut e := SExpr.term t
+  let mut es := #[]
   for (a, bi) in args.zip info.args do
-    e := .app1 e (← elabArg a bi)
-  return ⟨e, info.ret.1⟩
+    es := es.push (← elabArg a bi)
+  return ⟨.app t es.toList, info.ret.1⟩
 
 /-- `expression(p)`. -/
 partial def parseExpr (p : Prec) : M Typed := do
@@ -629,14 +629,7 @@ partial def freeVars (st : ElabState) (ctx : Ctx) : SExpr → List VarId
     | some (.bound _) => [v]
     | some (.reg _ vs) => vs
     | none => []
-  | e =>
-    let rec spine : SExpr → List SExpr → Option (TermId × List SExpr)
-      | .term t, acc => some (t, acc)
-      | .app1 f x, acc => spine f (x :: acc)
-      | .var _, _ => none
-    match spine e [] with
-    | none => []
-    | some (t, args) =>
+  | .app t args =>
       let info := st.terms[t]!
       let pairs := info.args.zip args
       let bvs := pairs.filterMap fun

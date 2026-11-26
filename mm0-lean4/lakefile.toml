@@ -1,6 +1,6 @@
 name = "mm0"
 version = "0.1.0"
-defaultTargets = ["MM0", "mm0-lean", "mm0-fuzz"]
+defaultTargets = ["MM0", "MM0Examples", "mm0-lean", "mm0-fuzz"]
 
 # MM0 in Lean 4: the derivability spec, the .mm0 parser, and (next) generic
 # model soundness. Independent of con-leche, so it can be mainlined.
@@ -14,3 +14,7 @@ root = "Main"
 [[lean_exe]]
 name = "mm0-fuzz"
 root = "Fuzz"
+
+# Worked examples on top of MM0: models of the example .mm0 files.
+[[lean_lib]]
+name = "MM0Examples"

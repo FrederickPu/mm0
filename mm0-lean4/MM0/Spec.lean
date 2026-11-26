@@ -1,12 +1,36 @@
 /-!
-MM0 in Lean 4 (Plan.md, M1): sorts with modifiers, terms, definitions with
-unfolding, axioms, theorems, bound vs. regular variables, dependency sets, and
-derivability.
+# MM0 derivability
 
-A port of `mm0-lean/mm0/mm0.lean` (Lean 3). It follows that file
-definition by definition, so the two can be compared side by side. That file in
-turn follows `examples/mm0.mm0`. Only Lean core is used: Lean 3's `finset` is a
-`List`, and the possibly infinite hypothesis set is a predicate.
+Sorts with modifiers, terms, definitions with unfolding, axioms, theorems,
+bound vs. regular variables, dependency sets, and derivability (Plan.md, M1).
+
+This follows `examples/mm0.mm0`, the MM0 spec written in MM0, definition by
+definition. It started as a port of `mm0-lean/mm0/mm0.lean` (Lean 3), and
+departs from both where they are too weak for the soundness theorem in
+`MM0.Model` to hold. Each departure matches what `mm0-c` actually checks:
+
+* **Expressions** are `app t [e₁, …, eₙ]`, as in `mm0.mm0`'s `SApp`, rather
+  than the Lean 3 port's curried `app1` chains. Lean 4 handles the nested
+  inductive. Conversion therefore has `mm0.mm0`'s rules: `refl`, `symm`,
+  `trans`, `cong` on whole applications, and `unfold`.
+* **`SafeSubst`** checks the theorem's own binders (`args`) to decide which
+  argument positions are bound and what they depend on. Both `mm0.mm0`'s
+  `VerifyProofThm` and the Lean 3 port read these from the *proof's* context
+  (`nth u ctx`), although `u` indexes the theorem's arguments. As written,
+  that lets a regular variable be instantiated with an expression containing
+  a bound variable it must not depend on.
+* **`unfold`** requires the dummy variables to be distinct and fresh: they
+  occur in none of the arguments. `mm0.mm0` requires freshness but not
+  distinctness, and the Lean 3 port requires neither. Without these
+  conditions, unfolding can capture variables. `mm0-c` allocates a new
+  variable for every dummy, so both conditions hold there.
+* **`Free`** uses "or" where the Lean 3 port had "and": `v` is free in
+  `t es` if it is free in an argument the term does not bind, *or* it is
+  passed for a bound argument the result depends on (mm0.md, Definition
+  checking).
+
+Only Lean core is used. Lean 3's `finset` is a `List`, and the possibly
+infinite hypothesis set is a predicate.
 -/
 namespace MM0
 
@@ -38,19 +62,44 @@ def Binder.sort : Binder → SortId
   | .bound s => s
   | .reg s _ => s
 
-/-- Expressions in curried form, as in the Lean 3 spec: a term applied to its
-arguments is `app1 (… (app1 (term t) e₁) …) eₙ`. -/
+/-- Expressions: variables (by index into the context) and terms applied to
+all their arguments (`mm0.mm0`'s `SVar` and `SApp`). -/
 inductive SExpr
   | var : VarId → SExpr
-  | term : TermId → SExpr
-  | app1 : SExpr → SExpr → SExpr
-  deriving DecidableEq, Repr, Inhabited
+  | app : TermId → List SExpr → SExpr
+  deriving Inhabited
 
-def SExpr.app' : SExpr → List SExpr → SExpr
-  | f, [] => f
-  | f, x :: xs => SExpr.app' (.app1 f x) xs
+-- `deriving` does not handle the nested inductive; these are written out.
+mutual
+def SExpr.decEq : (a b : SExpr) → Decidable (a = b)
+  | .var x, .var y =>
+    if h : x = y then isTrue (h ▸ rfl) else isFalse (by intro e; cases e; exact h rfl)
+  | .app t es, .app u fs =>
+    if h : t = u then
+      match SExpr.decEqList es fs with
+      | isTrue h2 => isTrue (by subst h; subst h2; rfl)
+      | isFalse h2 => isFalse (by intro e; cases e; exact h2 rfl)
+    else isFalse (by intro e; cases e; exact h rfl)
+  | .var _, .app _ _ => isFalse (by intro e; cases e)
+  | .app _ _, .var _ => isFalse (by intro e; cases e)
+def SExpr.decEqList : (a b : List SExpr) → Decidable (a = b)
+  | [], [] => isTrue rfl
+  | a :: as, b :: bs =>
+    match SExpr.decEq a b, SExpr.decEqList as bs with
+    | isTrue h1, isTrue h2 => isTrue (by subst h1; subst h2; rfl)
+    | isFalse h1, _ => isFalse (by intro e; cases e; exact h1 rfl)
+    | _, isFalse h2 => isFalse (by intro e; cases e; exact h2 rfl)
+  | [], _ :: _ => isFalse (by intro e; cases e)
+  | _ :: _, [] => isFalse (by intro e; cases e)
+end
 
-def SExpr.app (t : TermId) : List SExpr → SExpr := SExpr.app' (.term t)
+instance : DecidableEq SExpr := SExpr.decEq
+
+partial def SExpr.toString : SExpr → String
+  | .var v => s!"v{v}"
+  | .app t es => s!"({t}" ++ String.join (es.map (" " ++ ·.toString)) ++ ")"
+
+instance : Repr SExpr := ⟨fun e _ => .text e.toString⟩
 
 /-- A return type: a sort and the bound variables it may depend on. -/
 abbrev DepType := SortId × List VarId
@@ -93,27 +142,22 @@ inductive Ctx.Ok (e : Env) : Ctx → Prop
   | reg {s vs Γ} : DepType.Ok e Γ (s, vs) →
       Ctx.Ok e Γ → Ctx.Ok e (Γ ++ [.reg s vs])
 
-/-- `SExpr.Ok' E Γ e bis s`: `e` is a term applied to some of its arguments; it
-still expects the arguments `bis` and then has sort `s`. -/
-inductive SExpr.Ok' (E : Env) (Γ : Ctx) : SExpr → List Binder → SortId → Prop
-  | var {v bi} : Γ[v]? = some bi → SExpr.Ok' E Γ (.var v) [] bi.sort
-  | term {f bis ret o} : E.getTerm f bis ret o → SExpr.Ok' E Γ (.term f) bis ret.1
-  | app_var {f s v bis ret} :
-      Γ[v]? = some (.bound s) →
-      SExpr.Ok' E Γ f (.bound s :: bis) ret →
-      SExpr.Ok' E Γ (.app1 f (.var v)) bis ret
-  | app_reg {f x s vs bis ret} :
-      SExpr.Ok' E Γ f (.reg s vs :: bis) ret →
-      SExpr.Ok' E Γ x [] s →
-      SExpr.Ok' E Γ (.app1 f x) bis ret
+mutual
+/-- `e` is a well-formed expression of sort `s` (`mm0.mm0`'s `Expr`). -/
+inductive SExpr.Ok (E : Env) (Γ : Ctx) : SExpr → SortId → Prop
+  | var {v bi} : Γ[v]? = some bi → SExpr.Ok E Γ (.var v) bi.sort
+  | app {t args ret o es} : E.getTerm t args ret o →
+      SExpr.OkArgs E Γ es args → SExpr.Ok E Γ (.app t es) ret.1
 
-def SExpr.Ok (E : Env) (Γ : Ctx) (e : SExpr) (s : SortId) : Prop := SExpr.Ok' E Γ e [] s
-
-/-- `e` may be passed for an argument with binder `bi`: a bound variable for a
-bound binder, any expression of the right sort for a regular one. -/
-def SExpr.OkBi (E : Env) (Γ : Ctx) (e : SExpr) : Binder → Prop
-  | .bound s => ∃ v, e = .var v ∧ Γ[v]? = some (.bound s)
-  | .reg s _ => SExpr.Ok E Γ e s
+/-- The arguments `es` fit the binders `bis`: a bound variable for a bound
+binder, any expression of the right sort for a regular one (`ExprBi`). -/
+inductive SExpr.OkArgs (E : Env) (Γ : Ctx) : List SExpr → List Binder → Prop
+  | nil : SExpr.OkArgs E Γ [] []
+  | bound {v s es bis} : Γ[v]? = some (.bound s) → SExpr.OkArgs E Γ es bis →
+      SExpr.OkArgs E Γ (.var v :: es) (.bound s :: bis)
+  | reg {e s vs es bis} : SExpr.Ok E Γ e s → SExpr.OkArgs E Γ es bis →
+      SExpr.OkArgs E Γ (e :: es) (.reg s vs :: bis)
+end
 
 def SExpr.OkProv (E : Env) (Γ : Ctx) (e : SExpr) : Prop :=
   ∃ s sd, SExpr.Ok E Γ e s ∧ E.getSD s sd ∧ sd.provable = true
@@ -127,25 +171,18 @@ def SExpr.HasVar (Γ : Ctx) : SExpr → VarId → Prop
       match bi with
       | .bound _ => u = v
       | .reg _ vs => v ∈ vs
-  | .term _, _ => False
-  | .app1 f x, v => f.HasVar Γ v ∨ x.HasVar Γ v
+  | .app _ es, v => ∃ e, ∃ _ : e ∈ es, e.HasVar Γ v
 
-def MaybeFreeArgs (es : List SExpr) (a : Binder) (v : VarId) : Prop :=
-  ∃ s vs, a = .reg s vs ∧ ¬ ∃ u ∈ vs, es[u]? = some (.var v)
-
-/-- Free occurrence of `v`, looking through definitions: an occurrence is not
-free when the term binds it. `es` and `ps` collect the arguments seen so far
-and whether `v` is free in each. -/
-def SExpr.Free' (E : Env) (Γ : Ctx) (v : VarId) : SExpr → List SExpr → List Prop → Prop
-  | .var u, _, _ => SExpr.HasVar Γ (.var u) v
-  | .term f, es, ps => ∃ args r rs o,
-      E.getTerm f args (r, rs) o ∧
-      (∃ (n : Nat) (free : Prop) (a : Binder), ps[n]? = some free ∧ args[n]? = some a ∧
-        free ∧ MaybeFreeArgs es a v) ∧
-      ∃ u ∈ rs, es[u]? = some (.var v)
-  | .app1 f x, es, ps => SExpr.Free' E Γ v f (x :: es) (SExpr.Free' E Γ v x [] [] :: ps)
-
-def SExpr.Free (E : Env) (Γ : Ctx) (e : SExpr) (v : VarId) : Prop := SExpr.Free' E Γ v e [] []
+/-- Free occurrence of `v`, looking through binders: `v` is free in `t es` if
+it is free in an argument for a regular binder that does not depend on a
+bound binder `v` is passed for, or if `v` is passed for a bound binder that
+the return type depends on (mm0.md, Definition checking). -/
+def SExpr.Free (E : Env) (Γ : Ctx) : SExpr → VarId → Prop
+  | .var u, v => SExpr.HasVar Γ (.var u) v
+  | .app t es, v => ∃ args r rs o, E.getTerm t args (r, rs) o ∧
+      ((∃ e, ∃ _ : e ∈ es, ∃ (n : Nat) (s : SortId) (vs : List VarId), es[n]? = some e ∧ args[n]? = some (Binder.reg s vs) ∧
+          e.Free E Γ v ∧ ¬ ∃ u ∈ vs, es[u]? = some (SExpr.var v)) ∨
+        ∃ u ∈ rs, es[u]? = some (SExpr.var v))
 
 def TermOk (E : Env) (t : TermId) (args : Ctx) (ret : DepType) : Prop :=
   (¬ ∃ a r v, E.getTerm t a r v) ∧
@@ -188,37 +225,49 @@ inductive Env.Extend : Env → Env → Prop
   | thm_skip {E1 E2 a h r} :
       Env.Extend E1 E2 → Env.Extend E1 (E2 ++ [.thm a h r])
 
-/-- Simultaneous substitution of the variables `0, 1, …` by `σ`. -/
+/-- Simultaneous substitution of the variables `0, 1, …` by `σ`
+(`mm0.mm0`'s `substExpr`). -/
 def SExpr.subst (σ : List SExpr) : SExpr → SExpr
   | .var v => σ.getD v default
-  | .term f => .term f
-  | .app1 f x => .app1 (f.subst σ) (x.subst σ)
+  | .app t es => .app t (es.map fun e => e.subst σ)
 
-/-- Conversion (definitional unfolding). As in the Lean 3 spec, this is an
-inductive predicate rather than the proof objects `CExpr` of `mm0.mm0`. -/
-inductive Conv' (E : Env) (Γ : Ctx) : SExpr → SExpr → List Binder → SortId → Prop
-  | refl {e args s} : SExpr.Ok' E Γ e args s → Conv' E Γ e e args s
-  | symm {e1 e2 s} : Conv' E Γ e1 e2 [] s → Conv' E Γ e2 e1 [] s
-  | cong {f1 f2 bi bis x1 x2 s} :
-      SExpr.OkBi E Γ x1 bi → SExpr.OkBi E Γ x2 bi →
-      Conv' E Γ f1 f2 (bi :: bis) s →
-      Conv' E Γ x1 x2 [] bi.sort →
-      Conv' E Γ (.app1 f1 x1) (.app1 f2 x2) bis s
-  | unfold {t args ret ys val es zs e2 s} :
+mutual
+/-- Conversion (`mm0.mm0`'s `VerifyConv`), as an inductive predicate rather
+than proof objects `CExpr`. -/
+inductive Conv (E : Env) (Γ : Ctx) : SExpr → SExpr → SortId → Prop
+  | refl {e s} : SExpr.Ok E Γ e s → Conv E Γ e e s
+  | symm {e1 e2 s} : Conv E Γ e1 e2 s → Conv E Γ e2 e1 s
+  | trans {e1 e2 e3 s} : Conv E Γ e1 e2 s → Conv E Γ e2 e3 s → Conv E Γ e1 e3 s
+  | cong {t args ret o es1 es2} : E.getTerm t args ret o →
+      ConvArgs E Γ es1 es2 args → Conv E Γ (.app t es1) (.app t es2) ret.1
+  /-- Unfold a definition, instantiating its dummies with the bound variables
+  `zs` of the context, which are distinct and occur in no argument. -/
+  | unfold {t args ret ys val es zs} :
       E.getTerm t args ret (some (ys, val)) →
-      Forall₂ (SExpr.OkBi E Γ) es args →
+      SExpr.OkArgs E Γ es args →
       Forall₂ (fun y z => Γ[z]? = some (.bound y)) ys zs →
-      Conv' E Γ (SExpr.app t es) e2 [] s →
-      Conv' E Γ (SExpr.subst (es ++ zs.map .var) val) e2 [] s
+      zs.Nodup →
+      (∀ e ∈ es, ∀ z ∈ zs, ¬ e.HasVar Γ z) →
+      Conv E Γ (.app t es) (SExpr.subst (es ++ zs.map .var) val) ret.1
 
-def Conv (E : Env) (Γ : Ctx) (e1 e2 : SExpr) (s : SortId) : Prop := Conv' E Γ e1 e2 [] s
+/-- Argument-wise conversion (`VerifyConvs`): bound arguments must be the same
+variable. -/
+inductive ConvArgs (E : Env) (Γ : Ctx) : List SExpr → List SExpr → List Binder → Prop
+  | nil : ConvArgs E Γ [] [] []
+  | bound {v s es1 es2 bis} : Γ[v]? = some (.bound s) → ConvArgs E Γ es1 es2 bis →
+      ConvArgs E Γ (.var v :: es1) (.var v :: es2) (.bound s :: bis)
+  | reg {e1 e2 s vs es1 es2 bis} : Conv E Γ e1 e2 s → ConvArgs E Γ es1 es2 bis →
+      ConvArgs E Γ (e1 :: es1) (e2 :: es2) (.reg s vs :: bis)
+end
 
-/-- A substitution respects the theorem's distinctness conditions: a bound
-variable `u` that the regular variable `v` may not depend on is sent to a
-variable that does not occur in what `v` is sent to. -/
-def SafeSubst (Γ : Ctx) (σ : List SExpr) : Prop :=
-  ∀ u v, (∃ s, Γ[u]? = some (.bound s)) →
-    v < Γ.length → ¬ SExpr.HasVar Γ (.var v) u →
+/-- A substitution `σ` for a theorem with binders `args`, used in context `Γ`,
+respects the theorem's distinctness conditions: if `v` may not depend on the
+bound variable `u`, then the variable `u` is sent to does not occur in what
+`v` is sent to. Bound positions and dependencies are read from `args`, and
+occurrences from `Γ`. -/
+def SafeSubst (Γ : Ctx) (args : Ctx) (σ : List SExpr) : Prop :=
+  ∀ u v, (∃ s, args[u]? = some (.bound s)) →
+    v < args.length → ¬ SExpr.HasVar args (.var v) u →
     ∀ y e2, σ[u]? = some (.var y) → σ[v]? = some e2 →
       ¬ e2.HasVar Γ y
 
@@ -227,8 +276,8 @@ inductive Proof (E : Env) (Γ : Ctx) (Hs : SExpr → Prop) : SExpr → Prop
   | hyp {h} : Hs h → Proof E Γ Hs h
   | thm {args hs ret σ} :
       E.getThm args hs ret →
-      Forall₂ (SExpr.OkBi E Γ) σ args →
-      SafeSubst Γ σ →
+      SExpr.OkArgs E Γ σ args →
+      SafeSubst Γ args σ →
       (∀ h ∈ hs, Proof E Γ Hs (SExpr.subst σ h)) →
       Proof E Γ Hs (SExpr.subst σ ret)
   | conv {e1 e2 s} : Conv E Γ e1 e2 s → Proof E Γ Hs e1 → Proof E Γ Hs e2
